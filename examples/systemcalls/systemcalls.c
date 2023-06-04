@@ -1,5 +1,13 @@
 #include "systemcalls.h"
-
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <fcntl.h>
 /**
  * @param cmd the command to execute with system()
  * @return true if the command in @param cmd was executed
@@ -16,14 +24,22 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */	
-	if(system(cmd)==true)
+
+	int status;
+	int ps;
+	ps=system(cmd);
+	waitpid(0,&status,0);
+	if ( ps==-1)
 	{
-	       	return true;
-	}
-	else
-	{
+		perror("Sytem command fail");
 		return false;
 	}
+	else if(WIFEXITED(status) && WEXITSTATUS(status) == 127 )
+	{
+	       	fprintf(stderr,"Error with child process %d : %s",errno,strerror(errno));
+		return false;
+	}
+	return true;
 
 }
 
@@ -71,13 +87,13 @@ bool do_exec(int count, ...)
 	    perror("Error in fork");
 	    return false;
     }
-    elso
+    else
     {
 	    execv(command[0],command);
     }
     int status;
     wait(&status);
-    if (WIFEXITED(status))
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0 )
     {
 	    return false;
     }
@@ -115,7 +131,34 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
-
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    if (fd < 0) 
+    {
+	    perror("open failed");
+	    return false;
+    }
+    int ps=fork();
+    if ( ps ==-1 )
+    {
+	    perror("Fork failed");
+	    return false;
+    }
+    else if (ps==0)
+    {
+	    if (dup2(fd, 1) < 0 )
+	    {
+		    perror("dup2");
+		    return false;
+	    }
+	    close(fd);
+	    execv(command[0],command);
+    }
+    int status;
+    wait(&status);
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0 )
+    {
+            return false;
+    }
     va_end(args);
 
     return true;

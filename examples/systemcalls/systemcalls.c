@@ -15,9 +15,16 @@ bool do_system(const char *cmd)
  *  Call the system() function with the command set in the cmd
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
-*/
+*/	
+	if(system(cmd)==true)
+	{
+	       	return true;
+	}
+	else
+	{
+		return false;
+	}
 
-    return true;
 }
 
 /**
@@ -58,6 +65,22 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    pid_t pid=fork();
+    if ( pid ==-1 )
+    {
+	    perror("Error in fork");
+	    return false;
+    }
+    elso
+    {
+	    execv(command[0],command);
+    }
+    int status;
+    wait(&status);
+    if (WIFEXITED(status))
+    {
+	    return false;
+    }
 
     va_end(args);
 

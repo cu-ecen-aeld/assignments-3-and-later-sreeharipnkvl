@@ -81,7 +81,12 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-    pid_t pid=fork();
+     if (command[0][0] != '/') {
+        // Command does not include an absolute path
+        fprintf(stderr, "Absolute path required\n");
+        return false;
+    }
+    int pid=fork();
     if ( pid ==-1 )
     {
 	    perror("Error in fork");

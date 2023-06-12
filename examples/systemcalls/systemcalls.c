@@ -32,6 +32,7 @@ bool do_system(const char *cmd)
 	if ( ps==-1)
 	{
 		perror("Sytem command fail");
+		fprintf(stderr, "do_system");
 		return false;
 	}
 	else if(WIFEXITED(status) && WEXITSTATUS(status) == 127 )
@@ -70,7 +71,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+   // command[count] = command[count];
 
 /*
  * TODO:
@@ -81,26 +82,36 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-     if (command[0][0] != '/') {
+     va_end(args);
+     if ( *command[0] != '/' || *command[2] != '/') {
         // Command does not include an absolute path
-        fprintf(stderr, "Absolute path required\n");
+        fprintf(stderr, "Absolute path required %s\n", command[0]);
         return false;
     }
-    int pid=fork();
+     
+    fprintf(stderr, "Printing variable %s\n", command[2]); 
+    pid_t pid=fork();
     if ( pid ==-1 )
     {
 	    perror("Error in fork");
+	    fprintf(stderr, "fork");
 	    return false;
+    }
+    else if (pid == 0) {
+        // Child process
+        execv(command[0], command);
+	fprintf(stderr, "Execv failed\n");
+	return false;
     }
     else
     {
-	    execv(command[0],command);
-    }
-    int status;
-    wait(&status);
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0 )
-    {
+    	int status;
+    	wait(&status);
+    	if (!WIFEXITED(status))
+    	{
+	    fprintf(stderr, "exit_status");
 	    return false;
+    	}
     }
 
     va_end(args);
@@ -126,7 +137,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+   // command[count] = command[count];
 
 
 /*
@@ -136,35 +147,55 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
-    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
-    if (fd < 0) 
-    {
-	    perror("open failed");
-	    return false;
-    }
-    int ps=fork();
-    if ( ps ==-1 )
-    {
-	    perror("Fork failed");
-	    return false;
-    }
-    else if (ps==0)
-    {
-	    if (dup2(fd, 1) < 0 )
-	    {
-		    perror("dup2");
-		    return false;
-	    }
-	    close(fd);
-	    execv(command[0],command);
-    }
-    int status;
-    wait(&status);
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0 )
-    {
-            return false;
-    }
-    va_end(args);
+     va_end(args);
 
+    if (command[0][0] != '/') {
+        // Command does not include an absolute path
+        fprintf(stderr, "Absolute path required\n");
+        return false;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "Fork failed\n");
+        return false;
+    } else if (pid == 0) {
+        // Child process
+
+        // Open the output file
+        int fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0) {
+            fprintf(stderr, "Failed to open output file\n");
+            return false;
+        }
+
+        // Redirect stdout to the output file
+        if (dup2(fd, STDOUT_FILENO) < 0) {
+            fprintf(stderr, "Failed to redirect stdout\n");
+            return false;
+        }
+
+        // Close the file descriptor
+        close(fd);
+
+        // Execute the command
+        execv(command[0], command);
+
+        fprintf(stderr, "Execv failed\n");
+        return false;
+
+    } else {
+        // Parent process
+        int status;
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status)) {
+            int exitStatus = WEXITSTATUS(status);
+	    return exitStatus == 0;
+        } else {
+            fprintf(stderr, "Child process terminated abnormally\n");
+            return false;
+        }
+    }
     return true;
 }
